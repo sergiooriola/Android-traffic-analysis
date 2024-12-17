@@ -6,6 +6,7 @@ from collections import defaultdict
 def process_log_file(file_path, results, phase, dir_name, app_name):
     """Procesa un archivo de log y actualiza los resultados."""
     host_pattern = re.compile(r'"host": "([^"]+)"')
+    port_pattern = re.compile(r'"port_source": (\d+)')
 
     with open(file_path, 'r') as file:
         for line in file:
@@ -18,9 +19,19 @@ def process_log_file(file_path, results, phase, dir_name, app_name):
                         results[dir_name][app_name][f'{phase}_other_pii_count'] += 1
                         results[dir_name][app_name][f'{phase}_other_pii_values'][data['PII']] += 1
 
-                        # Extraer dominios y añadirlos al conjunto de dominios únicos solo si hay PII
+                        # Extraer dominios y puertos asociados
                         hosts = host_pattern.findall(line)
-                        results[dir_name][app_name][f'{phase}_unique_domains'].update(hosts)
+                        ports = port_pattern.findall(line)
+
+                        for host in hosts:
+                            for port in ports:
+                                results[dir_name][app_name][f'{phase}_unique_domains'].add((host, port))
+                                # Añadir entradas detalladas para cada PII tipo, dominio y puerto
+                                results[dir_name][app_name][f'{phase}_detailed_transfers'].append({
+                                    "PII Tipo": data['PII'],
+                                    "Dominio": host,
+                                    "Puerto": port
+                                })
 
             except json.JSONDecodeError as e:
                 print(f"Error decoding JSON in file {file_path}, line: {line.strip()}. Error: {e}")
@@ -32,10 +43,12 @@ def parse_logs():
         'dynamic_other_pii_count': 0,
         'dynamic_other_pii_values': defaultdict(int),
         'dynamic_unique_domains': set(),
+        'dynamic_detailed_transfers': [],
         'idle_no_pii_count': 0,
         'idle_other_pii_count': 0,
         'idle_other_pii_values': defaultdict(int),
-        'idle_unique_domains': set()
+        'idle_unique_domains': set(),
+        'idle_detailed_transfers': []
     }))
 
     # Nuevas carpetas organizadas por caso de uso
@@ -62,20 +75,5 @@ def parse_logs():
 
 if __name__ == "__main__":
     results = parse_logs()
-    for dir_name, dir_results in results.items():
-        print(f'Resultados para la carpeta: {dir_name}')
-        for app_name, app_results in dir_results.items():
-            print(f'  Resultados para la aplicación: {app_name}')
-            print('  Resultados de la fase dinámica:')
-            print(f'    No-PII: {app_results["dynamic_no_pii_count"]}')
-            print(f'    Otro PII: {app_results["dynamic_other_pii_count"]}')
-            for value, count in app_results['dynamic_other_pii_values'].items():
-                print(f'      {value}: {count}')
-            print(f'    Dominios únicos: {len(app_results["dynamic_unique_domains"])}')
-            print('  Resultados de la fase idle:')
-            print(f'    No-PII: {app_results["idle_no_pii_count"]}')
-            print(f'    Otro PII: {app_results["idle_other_pii_count"]}')
-            for value, count in app_results['idle_other_pii_values'].items():
-                print(f'      {value}: {count}')
-            print(f'    Dominios únicos: {len(app_results["idle_unique_domains"])}')
-            print('  -----------------------------------')
+    with open('results.json', 'w') as f:
+        json.dump(results, f, default=lambda o: list(o) if isinstance(o, set) else o, indent=4)
