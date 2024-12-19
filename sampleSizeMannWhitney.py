@@ -1,15 +1,17 @@
 from statsmodels.stats.power import TTestIndPower
 
-# Parámetros estándar para el cálculo del tamaño muestral
+# Parámetros estándar
 alpha = 0.05  # Nivel de significancia
-power = 0.8  # Potencia deseada
-effect_sizes = [0.2, 0.5, 0.8]  # Tamaños de efecto estándar: pequeño, mediano, grande
+power = 0.80  # Poder estadístico
+effect_size = 0.5  # Tamaño del efecto (medio, según la d de Cohen)
 
-# Instanciamos el cálculo de potencia para una prueba de dos muestras independientes
+# Inicializamos el análisis de poder para el test t independiente
 analysis = TTestIndPower()
 
-# Calculamos el tamaño muestral para cada tamaño de efecto
-sample_sizes = {f"Effect size {d}": analysis.solve_power(effect_size=d, alpha=alpha, power=power, alternative='two-sided')
-                for d in effect_sizes}
+# Calculamos el tamaño de muestra necesario por grupo
+sample_size_per_group = analysis.solve_power(effect_size=effect_size, alpha=alpha, power=power, alternative='two-sided')
 
-print(sample_sizes)
+# Resultado total (dos grupos)
+total_sample_size = sample_size_per_group * 2
+
+print(sample_size_per_group, total_sample_size)
